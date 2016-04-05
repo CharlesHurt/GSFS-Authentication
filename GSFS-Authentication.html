@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/><meta name="exporter-version" content="Evernote Mac 6.5 (453172)"/><meta name="author" content="charles@charleshurt.com"/><meta name="created" content="2016-04-05 18:39:22 +0000"/><meta name="source" content="desktop.mac"/><meta name="updated" content="2016-04-05 19:42:50 +0000"/><title>AUTHENTICATE PROCESS</title></head><body>
+<div style="box-sizing: border-box; padding: 0px 10px; vertical-align: top; overflow: visible; width: 8.156606851549755%;">
+<div><br/></div>
+</div>
+ 
+<div style="box-sizing: border-box; padding: 0px 10px; vertical-align: top; overflow: visible;">
+<div><b>HOW SIMPLE AUTHENTICATION WORKS IN A MEAN STACK WEB SITE</b></div>
+<div>Authentication is the process that verifies a user <i>is</i> who they say they are.</div>
+<div>In lay terms, this is "logging in".   Authorization is a similar term that is related but has</div>
+<div>a distinct meaning: Controlling access to resources.  A user may be authenticated (logged in) but</div>
+<div>may have restricted access to some resources, meaning they are not </div>
+<div>authorized to use every resource.</div>
+<div><br/></div>
+<div><b>Step 1 Registration</b></div>
+<div>Before a user can be authenticated they must first register.</div>
+<div>Registration begins when a web page contains a form</div>
+<div>with an input field of type "<span style="font-family: 'Courier New';">password</span>".  This web page must be</div>
+<div>served over "HTTP<span style="color: rgb(255, 38, 0);"><b>S</b></span>".  If not, the password will be publicly visible.</div>
+</div>
+<div style="box-sizing: border-box; padding: 0px 10px; vertical-align: top; overflow: visible;">
+<div><span style="box-sizing: border-box;"> .</span></div>
+</div>
+<div style="box-sizing: border-box; padding: 0px 10px; vertical-align: top; overflow: visible;">
+<div><span style="box-sizing: border-box;">On the backend/server, the password is immediately encrypted using something like <span style="font-family: 'Courier New';">bcrypt</span></span></div>
+<div><span style="box-sizing: border-box;">and never seen again. </span><span style="box-sizing: border-box;">The actual password is never stored.</span></div>
+<div><br/></div>
+<div>In a MEAN stack app, this would likely be done inside a <i>MODEL</i> method of mongo (v.s. an instance method)</div>
+</div>
+<div style="box-sizing: border-box; padding: 0px 10px; vertical-align: top; overflow: visible;">
+<div>NOTE: The creation of this method must occur prior to the Mongo Schema being compiled into a formal Model.</div>
+<div><br/></div>
+<div>The <span style="font-family: 'Courier New';"><b>model/user.js</b></span> code looks like this:</div>
+<div><br/></div>
+<div><span style="font-family: 'Courier New';">userSchema.statics.register = function(userObj, cb) {</span></div>
+<div><span style="font-family: 'Courier New';">  bcrypt.hash(userObj.password, 10, function(err, hash) {</span></div>
+<div><span style="font-family: 'Courier New';">    if(err) {</span></div>
+<div><span style="font-family: 'Courier New';">      return cb(err);</span></div>
+<div><span style="font-family: 'Courier New';">    }</span></div>
+<div><span style="font-family: 'Courier New';"><br/></span></div>
+<div><span style="font-family: 'Courier New';">    User.create({</span></div>
+<div><span style="font-family: 'Courier New';">      username: userObj.username,</span></div>
+<div><span style="font-family: 'Courier New';">      password: hash</span></div>
+<div><span style="font-family: 'Courier New';">    }, function(err) {</span></div>
+<div><span style="font-family: 'Courier New';">       cb(err);</span></div>
+<div><span style="font-family: 'Courier New';">    });</span></div>
+<div><span style="font-family: 'Courier New';">  });</span></div>
+<div><span style="font-family: 'Courier New';">};</span></div>
+<div><br/></div>
+<div>Notice that the <span style="font-family: 'Courier New';">User.create</span> method compiled the schema and created the Model</div>
+<div>in a single step.</div>
+<div><br/></div>
+<div><b>POSSIBLE CONFUSION:</b></div>
+<div>The "<span style="font-family: 'Courier New';">User</span>" does not appear to exist when <span style="font-family: 'Courier New';">User.create</span> is invoked.</div>
+<div>That is because, the below statement was executed in <span style="font-family: 'Courier New';"><b>model/user.js</b></span></div>
+<div>when the server started up:</div>
+<div><br/></div>
+<div><span style="font-family: 'Courier New';">User = mongoose.model('User', userSchema);</span></div>
+<div><br/></div>
+<div>Long after <span style="font-family: 'Courier New';">User</span> was defined, someone makes a request to register, which</div>
+<div>invoked the <span style="font-family: 'Courier New';">userSchema.statics.register</span> method.</div>
+<div><br/></div>
+<div>Once the user has registered, Mongo has a User Entry with the password</div>
+<div>encrypted inside.</div>
+<div><br/></div>
+<div><b>LOGGING IN</b></div>
+<div>At some later point, the user will request to login (again over HTTPS) and</div>
+<div>supply a username and password. This info will pass through the login</div>
+<div>route where it will be used to look up the user in Mongo. If the user is matched,</div>
+<div>the password is sent to bcrypt for comparison with the encrypted password.</div>
+<div>The <span style="font-family: 'Courier New';">bcrypt.compare</span> method encrypts the **attempted pwd** and compares</div>
+<div>with the encrypted password on file.</div>
+<div><br/></div>
+<div>If this process is successful, an "access token" is created to be used as a "Login OK" flag.</div>
+<div>First, a JavaScript object is created-typically containing the user "Id", and an</div>
+<div>"iat" (Issued At Time) field.</div>
+<div><br/></div>
+<div><span style="font-family: 'Courier New';">var payload = {</span></div>
+<div><span style="font-family: 'Courier New';">  userId: dbUser._id,</span></div>
+<div><span style="font-family: 'Courier New';">  iat: Date.now() // issued at time</span></div>
+<div><span style="font-family: 'Courier New';">}</span></div>
+<div><span style="font-family: 'Courier New';"><br/></span></div>
+<div>This object becomes the "payload" for the access token which created by</div>
+<div>encrypting the payload with a "secret"</div>
+<div>The code looks like this:</div>
+<div><span style="font-family: 'Courier New';"><br/></span></div>
+<div><span style="font-family: 'Courier New';">// Generate the token</span></div>
+<div><span style="font-family: 'Courier New';">var token = jwt.encode(payload, JWT_SECRET);</span></div>
+<div><br/></div>
+<div>The "secret" is a term used to make the payload unique, and is only ever held</div>
+<div>on the server.</div>
+<div><br/></div>
+<div><b>ACCESS</b></div>
+<div>Once this token has been created, the server sends it as a cookie to the client.</div>
+<div>Any subsequent requests by the client automatically include the cookie. Essentially</div>
+<div>the cookie acts like a hand stamp at a night club: when the client makes subsequent</div>
+<div>requests, the cookie(containing the token) is sent. On the backend, middleware</div>
+<div>is inserted in "protected" routes and blocks requests that do not have a valid token.</div>
+<div> </div>
+<div> </div>
+</div>
+</body></html>
